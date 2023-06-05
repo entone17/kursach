@@ -1,0 +1,244 @@
+#define _CRT_SECURE_NO_DEPRECATE
+#include <png.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+typedef struct {
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+    uint8_t alpha;
+} pixel_t;
+
+typedef struct {
+    pixel_t* pixels;
+    size_t width;
+    size_t height;
+} bitmap_t;
+
+static pixel_t* pixel_at(bitmap_t* bitmap, int x, int y) {
+    return bitmap->pixels + bitmap->width * y + x;
+}
+
+static int save_png_to_file(bitmap_t* bitmap, const char* path) {
+    FILE* fp;
+    png_structp png_ptr = NULL;
+    png_infop info_ptr = NULL;
+    size_t x, y;
+    png_byte** row_pointers = NULL;
+    int status = -1;
+    int pixel_size = 4;
+    int depth = 8;
+
+    fp = fopen(path, "wb");
+    if (!fp) {
+        goto fopen_failed;
+    }
+
+    png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    if (png_ptr == NULL) {
+        goto png_create_write_struct_failed;
+    }
+
+    info_ptr = png_create_info_struct(png_ptr);
+    if (info_ptr == NULL) {
+        goto png_create_info_struct_failed;
+    }
+
+    if (setjmp(png_jmpbuf(png_ptr))) {
+        goto png_failure;
+    }
+
+    png_set_IHDR(png_ptr,
+        info_ptr,
+        bitmap->width,
+        bitmap->height,
+        depth,
+        PNG_COLOR_TYPE_RGBA,
+        PNG_INTERLACE_NONE,
+        PNG_COMPRESSION_TYPE_DEFAULT,
+        PNG_FILTER_TYPE_DEFAULT);
+
+    row_pointers = png_malloc(png_ptr, bitmap->height * sizeof(png_byte*));
+    for (y = 0; y < bitmap->height; ++y) {
+        png_byte* row =png_malloc(png_ptr, sizeof(uint8_t) * bitmap->width * pixel_size);
+        row_pointers[y] = row;
+        for (x = 0; x < bitmap->width; ++x) {
+            pixel_t* pixel = pixel_at(bitmap, x, y);
+            *row++ = pixel->red;
+            *row++ = pixel->green;
+            *row++ = pixel->blue;
+            *row++ = pixel->alpha;
+        }
+    }
+
+    png_init_io(png_ptr, fp);
+    png_set_rows(png_ptr, info_ptr, row_pointers);
+    png_write_png(png_ptr, info_ptr, PNG_TRANSFORM_IDENTITY, NULL);
+
+    status = 0;
+
+    for (y = 0; y < bitmap->height; y++) {
+        png_free(png_ptr, row_pointers[y]);
+    }
+    png_free(png_ptr, row_pointers);
+
+png_failure:
+png_create_info_struct_failed:
+    png_destroy_write_struct(&png_ptr, &info_ptr);
+png_create_write_struct_failed:
+    fclose(fp);
+fopen_failed:
+    return status;
+}
+
+static int pix(int value, int max) {
+    if (value < 0)
+        return 0;
+    return (int)(256.0 * ((double)(value) / (double)max));
+}
+
+unsigned long __stack_chk_guard;
+void __stack_chk_guard_setup(void) {
+    __stack_chk_guard = 0xBAAAAAAD;
+}
+
+void printPNG(int** matrix, int n, int m, int number) {
+    bitmap_t fruit;
+    int x;
+    int y;
+    fruit.width = m;
+    fruit.height = n;
+
+    fruit.pixels = calloc(sizeof(pixel_t), fruit.width * fruit.height);
+
+    for (y = 0; y < fruit.height; y++) {
+        for (x = 0; x < fruit.width; x++) {
+            pixel_t* pixel = pixel_at(&fruit, x, y);
+
+            if (matrix[y][x] == 0) {
+                pixel->red = 255;
+                pixel->green = 255;
+                pixel->blue = 255;
+                pixel->alpha = 255;
+            }
+            else if (matrix[y][x] == 1) {
+                pixel->red = 255;
+                pixel->green = 0;
+                pixel->blue = 0;
+                pixel->alpha = 255;
+            }
+            else {
+                pixel->red = 0;
+                pixel->green = 0;
+                pixel->blue = 255;
+                pixel->alpha = 255;
+            }
+        }
+    }
+    char r[100];
+    sprintf(r, "number1.png", number);
+    save_png_to_file(&fruit, r);
+
+}
+
+void ptResult(int** arr, int n, int m) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            printf("%d ", arr[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+void pScaled(int data[], int n, int number) {
+   
+    int a2 = 8;
+    int a1 = 9 + 1;
+    int** matr = (int**)malloc(sizeof(int*) * a1);
+    for (int i = 0; i < a1; i++)
+        matr[i] = (int*)malloc(sizeof(int) * a2);
+    for (int i = 0; i < a1; i++) {
+        for (int j = 0; j < a2; j++) {
+            matr[i][j] = 0;
+        }
+    }
+
+    for (int i = 0; i < a2; i++) {
+        matr[a1 - (data[i])][i] = 1;
+    }
+
+    printf("\n");
+    for (int j = a2 - 1; j >= 0; j--) {
+        for (int i = a1 - 1; i >= 0; i--) {
+            if (matr[i][j] == 0)
+                matr[i][j] = 2;
+            else
+                break;
+        }
+    }
+
+    int scale_factor = 50;
+    int new_rows = a1 * scale_factor;
+    int new_cols = a2 * scale_factor;
+
+    int** result = (int**)malloc(sizeof(int*) * new_rows);
+    for (int i = 0; i < new_rows; i++)
+        result[i] = (int*)malloc(sizeof(int) * new_cols);
+
+    for (int i = 0; i < a1; i++) {
+        for (int j = 0; j < a2; j++) {
+            for (int i1 = i * scale_factor, s1 = 0; s1 < scale_factor; i1++, s1++) {
+                for (int j1 = j * scale_factor, s2 = 0; s2 < scale_factor; j1++, s2++) {
+                    result[i1][j1] = matr[i][j];
+                }
+            }
+        }
+    }
+    ptResult(matr, a1, a2);
+    printPNG(result, new_rows, new_cols, number);
+    for (int i = 0; i < new_rows; i++)
+        free(result[i]);
+    free(result);
+
+    for (int i = 0; i < a1; i++)
+        free(matr[i]);
+    free(matr);
+}
+
+void swap(int* x, int* y) {
+    int temp = *x;
+    *x = *y;
+    *y = temp;
+}
+
+int partition(int arr[], int low, int high) {
+    int pivot = arr[high];
+    int j = low - 1;
+    for (int i = low; i < high; i++) {
+        if (arr[i] < pivot) {
+            j++;
+            swap(&arr[i], &arr[j]);
+        }
+    }
+    swap(&arr[j + 1], &arr[high]);
+    return j + 1;
+}
+
+void quicksort(int arr[], int low, int n) {
+    int counter = 0;
+    if (low < n) {
+        int pi = partition(arr, low, n);
+        quicksort(arr, low, pi - 1);
+        quicksort(arr, pi + 1, n);
+    }
+    pScaled(arr, n, ++counter);
+}
+
+int main() {
+    int arr[] = { 2, 7, 3, 8, 6, 9, 1, 5 };
+    int size = sizeof(arr) / sizeof(arr[0]);
+    quicksort(arr, 0, size - 1);
+    return 0;
+}
